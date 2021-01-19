@@ -17,8 +17,8 @@ use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::*;
 
-use rand::os::OsRng;
-use rand::{Rng, StdRng};
+use rand::rngs::OsRng;
+use rand::RngCore;
 
 pub struct EccCtx {
     fctx: FieldCtx,
@@ -448,13 +448,13 @@ impl EccCtx {
     }
 
     pub fn random_uint(&self) -> BigUint {
-        let mut rng = OsRng::new().unwrap();
+
         let mut buf: [u8; 32] = [0; 32];
 
         let mut ret;
 
         loop {
-            rng.fill_bytes(&mut buf[..]);
+            OsRng.fill_bytes(&mut buf[..]);
             ret = BigUint::from_bytes_be(&buf[..]);
             if ret < self.get_n() - BigUint::one() && ret != BigUint::zero() {
                 break;
@@ -463,7 +463,10 @@ impl EccCtx {
         ret
     }
 
-    pub fn random_uint_with_rng(&self,rng: &mut StdRng) -> BigUint {
+    pub fn random_uint_with_rng<R>(&self,rng: &mut R) -> BigUint
+        where
+            R: ::rand::RngCore + ::rand::CryptoRng,
+    {
         let mut buf: [u8; 32] = [0; 32];
 
         let mut ret;

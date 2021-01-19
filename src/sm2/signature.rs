@@ -21,7 +21,6 @@ use sm3::hash::Sm3Hash;
 use yasna;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use rand::StdRng;
 
 pub type Pubkey = Point;
 pub type Seckey = BigUint;
@@ -314,9 +313,12 @@ impl SigCtx {
         (pk, sk)
     }
 
-    pub fn new_key(&self,rng: &mut StdRng) -> BigUint {
+    pub fn new_key<R>(&self,rng: &mut R) -> BigUint
+        where
+            R: ::rand::RngCore + ::rand::CryptoRng,
+    {
         let curve = &self.curve;
-        let mut sk: BigUint = curve.random_uint_with_rng(rng);
+        let sk: BigUint = curve.random_uint_with_rng(rng);
         sk
     }
 

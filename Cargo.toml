@@ -12,7 +12,7 @@ keywords = ["cipher", "cryptography"]
 license = "Apache-2.0"
 
 [dependencies]
-rand = "0.4"
+rand = "0.7"
 byteorder = "1"
 num-bigint = "0.2"
 num-traits = "0.2"
