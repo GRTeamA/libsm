@@ -239,6 +239,7 @@ impl EccCtx {
         Ok(p)
     }
 
+    // 基点G
     pub fn generator(&self) -> Point {
         let x = FieldElem::new([
             0x32c4_ae2c,

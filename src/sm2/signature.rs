@@ -327,7 +327,8 @@ impl SigCtx {
         if *sk >= *curve.get_n() || *sk == BigUint::zero() {
             panic!("invalid seckey");
         }
-        curve.mul(&sk, &curve.generator())
+        curve.g_mul(&sk)
+        //curve.mul(&sk, &curve.generator())
     }
 
     #[allow(clippy::result_unit_err)]
