@@ -16,7 +16,7 @@ use super::ecc::*;
 use super::field::FieldElem;
 use num_bigint::BigUint;
 use num_traits::*;
-use sm3::hash::Sm3Hash;
+use crate::sm3::hash::Sm3Hash;
 
 use yasna;
 

@@ -296,6 +296,7 @@ impl EccCtx {
         }
     }
 
+    //add-1998-cmo-2 curve_add 13m+4s
     pub fn add(&self, p1: &Point, p2: &Point) -> Point {
         if p1.is_zero() {
             return p2.clone();
@@ -305,34 +306,26 @@ impl EccCtx {
 
         let ctx = &self.fctx;
 
-        //if self.eq(&p1, &p2) {
-        //    return self.double(p1);
-        //}
+        let z1z1 = ctx.square(&p1.z);
+        let z2z2 = ctx.square(&p2.z);
+        let u1 = ctx.mul(&p1.x,&z2z2);
+        let u2 = ctx.mul(&p2.x,&z1z1);
+        let s1 = ctx.mul(&p1.y,&ctx.mul(&p2.z,&z2z2));
+        let s2 = ctx.mul(&p2.y,&ctx.mul(&p1.z,&z1z1));
 
-        let lam1 = ctx.mul(&p1.x, &ctx.square(&p2.z));
-        let lam2 = ctx.mul(&p2.x, &ctx.square(&p1.z));
-        let lam3 = ctx.sub(&lam1, &lam2);
+        let h = ctx.sub(&u2,&u1);
+        let hh = ctx.square(&h);
+        let hhh = ctx.mul(&h,&hh);
+        let r = ctx.sub(&s2,&s1);
+        let v = ctx.mul(&u1,&hh);
 
-        let lam4 = ctx.mul(&p1.y, &ctx.cubic(&p2.z));
-        let lam5 = ctx.mul(&p2.y, &ctx.cubic(&p1.z));
-        let lam6 = ctx.sub(&lam4, &lam5);
+        let x3 = ctx.sub(&ctx.sub(&ctx.square(&r),&hhh),&ctx.mul(&FieldElem::from_num(2), &v));
 
-        let lam7 = ctx.add(&lam1, &lam2);
-        let lam8 = ctx.add(&lam4, &lam5);
+        let rvx3 = ctx.mul(&r,&ctx.sub(&v,&x3));
+        let s1hhh = ctx.mul(&s1,&hhh);
 
-        let x3 = ctx.sub(&ctx.square(&lam6), &ctx.mul(&lam7, &ctx.square(&lam3)));
-
-        let lam9 = ctx.sub(
-            &ctx.mul(&lam7, &ctx.square(&lam3)),
-            &ctx.mul(&FieldElem::from_num(2), &x3),
-        );
-
-        let y3 = ctx.mul(
-            &self.inv2,
-            &ctx.sub(&ctx.mul(&lam9, &lam6), &ctx.mul(&lam8, &ctx.cubic(&lam3))),
-        );
-
-        let z3 = ctx.mul(&p1.z, &ctx.mul(&p2.z, &lam3));
+        let y3 = ctx.sub(&rvx3,&s1hhh);
+        let z3 = ctx.mul(&p1.z, &ctx.mul(&p2.z, &h));
 
         Point {
             x: x3,
@@ -341,23 +334,41 @@ impl EccCtx {
         }
     }
 
-    pub fn double(&self, p: &Point) -> Point {
-        let ctx = &self.fctx;
-        // λ1 = 3 * x1^2 + a * z1^4
-        let lam1 = ctx.add(
-            &ctx.mul(&FieldElem::from_num(3), &ctx.square(&p.x)),
-            &ctx.mul(&self.a, &ctx.square(&ctx.square(&p.z))),
-        );
-        // λ2 = 4 * x1 * y1^2
-        let lam2 = &ctx.mul(&FieldElem::from_num(4), &ctx.mul(&p.x, &ctx.square(&p.y)));
-        // λ3 = 8 * y1^4
-        let lam3 = &ctx.mul(&FieldElem::from_num(8), &ctx.square(&ctx.square(&p.y)));
+    //add-1986-cc-2 curve_add 12mul+5s+3cubic(=6m) = 23m
+    pub fn old_add(&self, p1: &Point, p2: &Point) -> Point {
+        p1.clone()
+    }
 
-        // x3 = λ1^2 - 2 * λ2
-        let x3 = ctx.sub(&ctx.square(&lam1), &ctx.mul(&FieldElem::from_num(2), &lam2));
-        // y3 = λ1 * (λ2 - x3) - λ3
-        let y3 = ctx.sub(&ctx.mul(&lam1, &ctx.sub(&lam2, &x3)), &lam3);
-        // z3 = 2 * y1 * z1
+    //dbl-1998-cmo-2 9m+6s
+    // XX = X12
+    // YY = Y12
+    // ZZ = Z12
+    // S = 4*X1*YY
+    // M = 3*XX+a*ZZ2
+    // T = M2-2*S
+    // X3 = T
+    // Y3 = M*(S-T)-8*YY2
+    // Z3 = 2*Y1*Z1
+    pub fn double(&self, p: &Point) -> Point {
+        if p.is_zero(){
+            return p.clone();
+        }
+
+        let ctx = &self.fctx;
+
+        let xx = ctx.square(&p.x);
+        let yy = ctx.square(&p.y);
+        let zz = ctx.square(&p.z);
+        let yy8 = &ctx.mul(&FieldElem::from_num(8), &ctx.square(&yy));
+
+        let s = ctx.mul(&FieldElem::from_num(4), &ctx.mul(&p.x, &yy));
+        let m = ctx.add(&ctx.mul(&FieldElem::from_num(3), &xx),
+                        &ctx.mul(&self.a, &ctx.square(&zz)));
+
+        let x3 = ctx.sub(&ctx.square(&m), &ctx.mul(&FieldElem::from_num(2), &s));
+
+        let y3 = ctx.sub(&ctx.mul(&m, &ctx.sub(&s, &x3)), &yy8);
+
         let z3 = ctx.mul(&FieldElem::from_num(2), &ctx.mul(&p.y, &p.z));
 
         Point {
@@ -672,8 +683,9 @@ mod tests {
 
 #[cfg(feature = "internal_benches")]
 mod internal_benches {
-    use sm2::ecc::EccCtx;
-    use sm2::field::FieldElem;
+    use crate::sm2::ecc::EccCtx;
+    use crate::sm2::field::FieldElem;
+
     extern crate test;
 
     #[bench]
