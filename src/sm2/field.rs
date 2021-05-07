@@ -328,45 +328,60 @@ fn raw_sub(a: &FieldElem, b: &FieldElem) -> (FieldElem, u32) {
 }
 
 #[inline(always)]
-fn u32_mul(a: u32, b: u32) -> (u64, u64) {
-    let uv = u64::from(a) * u64::from(b);
-    let u = uv >> 32;
-    let v = uv & 0xffff_ffff;
+fn u64_mul(a: u64, b: u64) -> (u128, u128) {
+    let uv = u128::from(a) * u128::from(b);
+    let u = uv >> 64;
+    let v = uv & 0xffff_ffff_ffff_ffff;
     (u, v)
 }
 
-fn raw_mul(a: &FieldElem, b: &FieldElem) -> [u32; 16] {
-    let mut local: u64 = 0;
-    let mut carry: u64 = 0;
-    let mut ret: [u32; 16] = [0; 16];
+fn raw_mul(u32a: &FieldElem, u32b: &FieldElem) -> [u32; 16]{
+    let mut local: u128 = 0;
+    let mut carry: u128 = 0;
+    let mut ret: [u64; 8] = [0; 8];
+    let mut result: [u32; 16] = [0; 16];
+    let mut a:[u64;4] = [0;4];
+    let mut b:[u64;4] = [0;4];
+
+    for i in 0..4{
+        a[i] = (u64::from(u32a.value[i*2]) << 32)+ u64::from(u32a.value[i*2+1]);
+        b[i] = (u64::from(u32b.value[i*2]) << 32)+ u64::from(u32b.value[i*2+1]);
+    }
 
     let mut ret_idx = 0;
-    while ret_idx < 15 {
-        let index = 15 - ret_idx;
+    while ret_idx < 7 {
+        let index = 7 - ret_idx;
         let mut a_idx = 0;
-        while a_idx < 8 {
+        while a_idx < 4 {
             if a_idx > ret_idx {
                 break;
             }
             let b_idx = ret_idx - a_idx;
-            if b_idx < 8 {
-                let (hi, lo) = u32_mul(a.value[7 - a_idx], b.value[7 - b_idx]);
+            if b_idx < 4 {
+                let (hi, lo) = u64_mul(a[3 - a_idx], b[3 - b_idx]);
                 local += lo;
                 carry += hi;
             }
 
             a_idx += 1;
         }
-        carry += local >> 32;
-        local &= 0xffff_ffff;
-        ret[index] = local as u32;
+        carry += local >> 64;
+        //local &= 0xffff_ffff_ffff_ffff;
+        ret[index] = local as u64;
         local = carry;
         carry = 0;
 
         ret_idx += 1;
     }
-    ret[0] = local as u32;
-    ret
+    ret[0] = local as u64;
+
+    for i in 0..8{
+        result[i*2] = (ret[i] >> 32) as u32;
+        result[i*2+1] = ret[i]  as u32;
+    }
+
+    result
+
 }
 
 impl FieldElem {

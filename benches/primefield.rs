@@ -8,23 +8,15 @@ extern crate pprof;
 mod perf;
 
 use criterion::Criterion;
-use libsm::sm2::field::{FieldCtx, FieldElem};
+use libsm::sm2::field::*;
 
 fn pmul(c: &mut Criterion) {
     let ctx = FieldCtx::new();
-    let modulus = FieldElem::new([
-        0xffff_fffe,
-        0xffff_ffff,
-        0xffff_ffff,
-        0xffff_ffff,
-        0xffff_ffff,
-        0x0000_0000,
-        0xffff_ffff,
-        0xffff_ffff,
-    ]);
+    let a= FieldElem::new([0xffff_ffff;8]);
+    let d= FieldElem::new([0xffff_ffff;8]);
 
     c.bench_function("field mul", move |b| {
-        b.iter(|| ctx.mul(&modulus,&modulus));
+        b.iter(|| raw_add(&a,&d));
     });
 }
 

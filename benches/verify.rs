@@ -21,7 +21,7 @@ fn verify_key(c: &mut Criterion) {
     let (pk, sk) = ctx.new_keypair();
     let signature = ctx.sign(msg, &sk, &pk);
 
-    c.bench_function("Ecc old add ", move |b| {
+    c.bench_function("verify ", move |b| {
         b.iter(|| ctx.verify(msg, &pk, &signature));
     });
 }

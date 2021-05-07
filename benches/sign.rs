@@ -20,7 +20,7 @@ fn signature(c: &mut Criterion) {
     let ctx = SigCtx::new();
     let (pk, sk) = ctx.new_keypair();
 
-    c.bench_function("Ecc old add ", move |b| {
+    c.bench_function("sign", move |b| {
         b.iter(|| ctx.sign(msg, &sk, &pk));
     });
 }

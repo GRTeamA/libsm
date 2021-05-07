@@ -25,7 +25,6 @@ pub struct EccCtx {
     a: FieldElem,
     b: FieldElem,
     n: BigUint,
-    inv2: FieldElem,
 }
 
 #[derive(Clone)]
@@ -77,7 +76,6 @@ lazy_static! {
 
 impl EccCtx {
     pub fn new() -> EccCtx {
-        let fctx = FieldCtx::new();
         EccCtx {
             fctx: FieldCtx::new(),
             a: FieldElem::new([
@@ -105,7 +103,6 @@ impl EccCtx {
                 16,
             )
             .unwrap(),
-            inv2: fctx.inv(&FieldElem::from_num(2)),
         }
     }
 
@@ -332,11 +329,6 @@ impl EccCtx {
             y: y3,
             z: z3,
         }
-    }
-
-    //add-1986-cc-2 curve_add 12mul+5s+3cubic(=6m) = 23m
-    pub fn old_add(&self, p1: &Point, p2: &Point) -> Point {
-        p1.clone()
     }
 
     //dbl-1998-cmo-2 9m+6s
