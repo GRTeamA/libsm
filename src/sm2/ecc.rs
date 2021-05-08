@@ -34,25 +34,6 @@ pub struct Point {
     pub z: FieldElem,
 }
 
-fn pre_vec_gen(n: u32) -> [u32; 8] {
-    let mut pre_vec: [u32; 8] = [0; 8];
-    let mut i = 0;
-    while i < 8 {
-        pre_vec[7 - i] = (n >> i) & 0x01;
-        i += 1;
-    }
-    pre_vec
-}
-fn pre_vec_gen2(n: u32) -> [u32; 8] {
-    let mut pre_vec: [u32; 8] = [0; 8];
-    let mut i = 0;
-    while i < 8 {
-        pre_vec[7 - i] = ((n >> i) & 0x01) << 16;
-        i += 1;
-    }
-    pre_vec
-}
-
 fn g_table() -> Vec<Vec<Point>>{
     let ctx = EccCtx::new();
     let mut init = BigUint::one();
@@ -82,25 +63,6 @@ fn g_table() -> Vec<Vec<Point>>{
 lazy_static! {
     static ref TABLE: Vec<Vec<Point>> = {
         g_table()
-    };
-
-    static ref TABLE_1: Vec<Point> = {
-        let mut table: Vec<Point> = Vec::new();
-        let ctx = EccCtx::new();
-        for i in 0..256 {
-            let p1 = ctx.mul_raw(&pre_vec_gen(i as u32), &ctx.generator());
-            table.push(p1);
-        }
-        table
-    };
-    static ref TABLE_2: Vec<Point> = {
-        let mut table: Vec<Point> = Vec::new();
-        let ctx = EccCtx::new();
-        for i in 0..256 {
-            let p1 = ctx.mul_raw(&pre_vec_gen2(i as u32), &ctx.generator());
-            table.push(p1);
-        }
-        table
     };
 }
 
@@ -427,42 +389,6 @@ impl EccCtx {
 
             i += 1;
         }
-        q
-    }
-    #[inline(always)]
-    fn ith_bit(n: u32, i: i32) -> u32 {
-        (n >> i) & 0x01
-    }
-
-    #[inline(always)]
-    fn compose_k(v: &[u32], i: i32) -> u32 {
-        EccCtx::ith_bit(v[7], i)
-            + (EccCtx::ith_bit(v[6], i) << 1)
-            + (EccCtx::ith_bit(v[5], i) << 2)
-            + (EccCtx::ith_bit(v[4], i) << 3)
-            + (EccCtx::ith_bit(v[3], i) << 4)
-            + (EccCtx::ith_bit(v[2], i) << 5)
-            + (EccCtx::ith_bit(v[1], i) << 6)
-            + (EccCtx::ith_bit(v[0], i) << 7)
-    }
-
-    pub fn g_mul_(&self, m: &BigUint) -> Point {
-        let m = m % self.get_n();
-        let k = FieldElem::from_biguint(&m);
-        let mut q = self.zero();
-
-        let mut i = 15;
-        while i >= 0 {
-            q = self.double(&q);
-            let k1 = EccCtx::compose_k(&k.value, i);
-            let k2 = EccCtx::compose_k(&k.value, i + 16);
-            let p1 = &TABLE_1[k1 as usize];
-            let p2 = &TABLE_2[k2 as usize];
-            q = self.add(&self.add(&q, p1), p2);
-
-            i -= 1;
-        }
-
         q
     }
 
