@@ -53,7 +53,37 @@ fn pre_vec_gen2(n: u32) -> [u32; 8] {
     pre_vec
 }
 
+fn g_table() -> Vec<Vec<Point>>{
+    let ctx = EccCtx::new();
+    let mut init = BigUint::one();
+    let radix = BigUint::from(256 as u32);
+    let mut table:Vec<Vec<Point>> = Vec::new();
+    let mut num:Vec<BigUint> = Vec::new();
+
+    for i in 0..256{
+        num.push(BigUint::from(i as u32));
+    }
+
+    for i in 0..32 {
+        let mut table_row: Vec<Point> = Vec::new();
+        for j in 0..256{
+            let t = &num[j]*&init;
+            let p1 = ctx.mul(&t, &ctx.generator());
+            table_row.push(p1);
+        }
+        table.push(table_row);
+        init *= &radix;
+    }
+
+    table
+
+}
+
 lazy_static! {
+    static ref TABLE: Vec<Vec<Point>> = {
+        g_table()
+    };
+
     static ref TABLE_1: Vec<Point> = {
         let mut table: Vec<Point> = Vec::new();
         let ctx = EccCtx::new();
@@ -416,7 +446,7 @@ impl EccCtx {
             + (EccCtx::ith_bit(v[0], i) << 7)
     }
 
-    pub fn g_mul(&self, m: &BigUint) -> Point {
+    pub fn g_mul_(&self, m: &BigUint) -> Point {
         let m = m % self.get_n();
         let k = FieldElem::from_biguint(&m);
         let mut q = self.zero();
@@ -431,6 +461,22 @@ impl EccCtx {
             q = self.add(&self.add(&q, p1), p2);
 
             i -= 1;
+        }
+
+        q
+    }
+
+    pub fn g_mul(&self, m: &BigUint) -> Point {
+        let m = m % self.get_n();
+        let k = FieldElem::from_biguint(&m);
+        let mut q = self.zero();
+
+        for i in 0..8{
+            for j in 0..4{
+                let bits = (((&k.value[i])>>(8*(3-j))) & 0xff) as usize;
+                let index = (31-i*4-j) as usize;
+                q = self.add(&q,&TABLE[index][bits]);
+            }
         }
 
         q
@@ -627,6 +673,16 @@ mod tests {
         let nn_g = curve.mul(&n, &g);
         assert!(curve.eq(&nn_g, &new_g));
     }
+
+    #[test]
+    // fn test_g_table() {
+    //     let curve = EccCtx::new();
+    //     let twice_g = curve.g_mul(&BigUint::from_u64(4_294_967_296).unwrap());
+    //     let table_g = curve.g_mul_new(&BigUint::from_u64(4_294_967_296).unwrap());
+    //
+    //     print!("{}",twice_g);
+    //     println!("{}",table_g);
+    // }
 
     #[test]
     fn test_inv_n() {
