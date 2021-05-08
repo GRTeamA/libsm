@@ -39,13 +39,10 @@ fn g_table() -> Vec<Vec<Point>>{
     let mut init = BigUint::one();
     let radix = BigUint::from(256 as u32);
     let mut table:Vec<Vec<Point>> = Vec::new();
-    let mut num:Vec<BigUint> = Vec::new();
 
-    for i in 0..256{
-        num.push(BigUint::from(i as u32));
-    }
+    let num:Vec<_> = (0..256).map(|i:u32| BigUint::from(i)).collect();
 
-    for i in 0..32 {
+    for _i in 0..32 {
         let mut table_row: Vec<Point> = Vec::new();
         for j in 0..256{
             let t = &num[j]*&init;
@@ -64,6 +61,44 @@ lazy_static! {
     static ref TABLE: Vec<Vec<Point>> = {
         g_table()
     };
+
+    static ref GENERATOR: Point = {
+        let ctx = EccCtx::new();
+        let x = FieldElem::new([
+            0x32c4_ae2c,
+            0x1f19_8119,
+            0x5f99_0446,
+            0x6a39_c994,
+            0x8fe3_0bbf,
+            0xf266_0be1,
+            0x715a_4589,
+            0x334c_74c7,
+        ]);
+        let y = FieldElem::new([
+            0xbc37_36a2,
+            0xf4f6_779c,
+            0x59bd_cee3,
+            0x6b69_2153,
+            0xd0a9_877c,
+            0xc62a_4740,
+            0x02df_32e5,
+            0x2139_f0a0,
+        ]);
+
+        match ctx.new_point(&x, &y) {
+            Ok(p) => p,
+            Err(m) => panic!(m),
+        }
+    };
+
+   static ref ZERO: Point = {
+        let ctx = EccCtx::new();
+        let x = FieldElem::from_num(1);
+        let y = FieldElem::from_num(1);
+        let z = FieldElem::zero();
+
+        ctx.new_jacobian(&x, &y, &z).unwrap()
+   };
 }
 
 impl EccCtx {
@@ -230,39 +265,11 @@ impl EccCtx {
 
     // 基点G
     pub fn generator(&self) -> Point {
-        let x = FieldElem::new([
-            0x32c4_ae2c,
-            0x1f19_8119,
-            0x5f99_0446,
-            0x6a39_c994,
-            0x8fe3_0bbf,
-            0xf266_0be1,
-            0x715a_4589,
-            0x334c_74c7,
-        ]);
-        let y = FieldElem::new([
-            0xbc37_36a2,
-            0xf4f6_779c,
-            0x59bd_cee3,
-            0x6b69_2153,
-            0xd0a9_877c,
-            0xc62a_4740,
-            0x02df_32e5,
-            0x2139_f0a0,
-        ]);
-
-        match self.new_point(&x, &y) {
-            Ok(p) => p,
-            Err(m) => panic!(m),
-        }
+        GENERATOR.clone()
     }
 
     pub fn zero(&self) -> Point {
-        let x = FieldElem::from_num(1);
-        let y = FieldElem::from_num(1);
-        let z = FieldElem::zero();
-
-        self.new_jacobian(&x, &y, &z).unwrap()
+        ZERO.clone()
     }
 
     pub fn to_affine(&self, p: &Point) -> (FieldElem, FieldElem) {
@@ -599,16 +606,6 @@ mod tests {
         let nn_g = curve.mul(&n, &g);
         assert!(curve.eq(&nn_g, &new_g));
     }
-
-    #[test]
-    // fn test_g_table() {
-    //     let curve = EccCtx::new();
-    //     let twice_g = curve.g_mul(&BigUint::from_u64(4_294_967_296).unwrap());
-    //     let table_g = curve.g_mul_new(&BigUint::from_u64(4_294_967_296).unwrap());
-    //
-    //     print!("{}",twice_g);
-    //     println!("{}",table_g);
-    // }
 
     #[test]
     fn test_inv_n() {
