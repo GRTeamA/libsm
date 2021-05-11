@@ -377,6 +377,50 @@ impl EccCtx {
         self.mul_raw(&k.value, p)
     }
 
+    pub fn w_naf(&self, m:&[u32], w: usize) -> [i8;257]{
+        let mut carry = 0;
+        let mut bit = 0;
+        let mut ret: [i8;257] = [0;257];
+        let mut n:[u32;9] = [0;9];
+
+        for i in 1..9{
+            n[i] = m[i-1].clone();
+        }
+
+        let window: u32 = (1 << w) -1;
+
+        while bit < 256 {
+            let u32_idx = 8 - bit as usize / 32;
+            let bit_idx = 31 - bit as usize % 32;
+            let mut word: u32 = 0;
+
+            if ((n[u32_idx] >> (31 - bit_idx)) & 1) == carry{
+                bit += 1;
+                continue;
+            }
+
+            if bit_idx >= w-1 {
+                word = (n[u32_idx] >> (31 - bit_idx)) & window;
+            }
+            else{
+                word = ((n[u32_idx] >> (31 - bit_idx)) | (n[u32_idx - 1] << (bit_idx + 1)) ) & window;
+            }
+
+            word += carry;
+
+            carry = (word >> (w-1)) & 1;
+            ret[bit] = word as i8 - (carry<<w) as i8;
+
+            bit += w;
+        }
+
+        if carry == 1{
+            ret[256] = 1;
+        }
+
+        ret
+    }
+
     pub fn mul_raw(&self, m: &[u32], p: &Point) -> Point {
         let mut q = self.zero();
 
@@ -406,7 +450,7 @@ impl EccCtx {
 
         for i in 0..8{
             for j in 0..4{
-                let bits = (((&k.value[i])>>(8*(3-j))) & 0xff) as usize;
+                let bits = (((&k.value[i]) >> (8 * (3-j))) & 0xff) as usize;
                 let index = (31-i*4-j) as usize;
                 q = self.add(&q,&TABLE[index][bits]);
             }
@@ -544,6 +588,7 @@ impl Point {
 }
 
 use std::fmt;
+use std::convert::TryInto;
 
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -605,6 +650,41 @@ mod tests {
         let new_g = curve.g_mul(&n);
         let nn_g = curve.mul(&n, &g);
         assert!(curve.eq(&nn_g, &new_g));
+    }
+
+    #[test]
+    fn test_w_naf() {
+        let curve = EccCtx::new();
+
+        let max = BigUint::from_str_radix(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            16,
+        ).unwrap();
+
+        let lmax = BigUint::from_str_radix(
+            "BC2FFFFFF",
+            16,
+        ).unwrap();
+
+        let num = BigUint::from(1122334455 as u32)-BigUint::one();
+
+        let k = FieldElem::from_biguint(&lmax);
+        let ret = curve.w_naf(&k.value,6);
+
+        // let init = BigUint::one();
+        // let two = BigUint::from(2 as u32);
+        //
+        // for i in 0..257{
+        //     let num:u32 = 0;
+        //     if ret[i] > 0{
+        //
+        //     }
+        // }
+        for i in 0..257{
+            if ret[i]!=0{
+                println!("{},{}",i,ret[i]);
+            }
+        }
     }
 
     #[test]
