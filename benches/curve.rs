@@ -19,7 +19,7 @@ fn ecc_add(c: &mut Criterion) {
     let n = curve.get_n() - BigUint::one();
 
     c.bench_function("Ecc old add ", move |b| {
-        b.iter(|| curve.g_mul(&n));
+        b.iter(|| curve.mul(&n, &g));
     });
 }
 

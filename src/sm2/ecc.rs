@@ -27,7 +27,7 @@ pub struct EccCtx {
     n: BigUint,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Point {
     pub x: FieldElem,
     pub y: FieldElem,
@@ -300,6 +300,10 @@ impl EccCtx {
             return p1.clone();
         }
 
+        if p1 == p2 {
+            return self.double(&p1);
+        }
+
         let ctx = &self.fctx;
 
         let z1z1 = ctx.square(&p1.z);
@@ -374,10 +378,10 @@ impl EccCtx {
 
         let k = FieldElem::from_biguint(&m);
 
-        self.mul_raw(&k.value, p)
+        self.mul_raw_naf(&k.value, p)
     }
 
-    pub fn w_naf(&self, m:&[u32], w: usize) -> [i8;257]{
+    pub fn w_naf(&self, m:&[u32], w: usize, lst: &mut usize) -> [i8;257]{
         let mut carry = 0;
         let mut bit = 0;
         let mut ret: [i8;257] = [0;257];
@@ -411,14 +415,48 @@ impl EccCtx {
             carry = (word >> (w-1)) & 1;
             ret[bit] = word as i8 - (carry<<w) as i8;
 
+            *lst = 0+bit;
             bit += w;
+
         }
 
         if carry == 1{
             ret[256] = 1;
+            *lst = 256;
         }
 
         ret
+    }
+
+    pub fn mul_raw_naf(&self, m: &[u32], p: &Point) -> Point {
+        let mut i = 256;
+        let mut q = self.zero();
+        let naf = self.w_naf(&m,5, &mut i);
+        let offset = 16;
+        let mut table = [self.zero();32];
+        let double_p = self.double(&p);
+
+        table[1+offset] = p.clone();
+        table[offset-1] = self.neg(&table[1+offset]);
+        for i in 1..8{
+            table[2 * i + offset + 1] = self.add(&double_p,&table[2 * i + offset -1]);
+            table[offset - 2 * i - 1] = self.neg(&table[2 * i + offset + 1]);
+        }
+
+        loop {
+            q = self.double(&q);
+
+            if naf[i] != 0 {
+                let index = (naf[i] + 16) as usize;
+                q = self.add(&q, &table[index]);
+            }
+
+            if i == 0 {
+                break;
+            }
+            i -= 1;
+        }
+        q
     }
 
     pub fn mul_raw(&self, m: &[u32], p: &Point) -> Point {
@@ -588,7 +626,6 @@ impl Point {
 }
 
 use std::fmt;
-use std::convert::TryInto;
 
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -655,36 +692,33 @@ mod tests {
     #[test]
     fn test_w_naf() {
         let curve = EccCtx::new();
+        let mut lst = 0;
 
-        let max = BigUint::from_str_radix(
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        let n = curve.get_n() - BigUint::one();
+        let _num = BigUint::from(1122334455 as u32)-BigUint::one();
+
+        let k = FieldElem::from_biguint(&n);
+        let ret = curve.w_naf(&k.value,5,&mut lst);
+        let mut sum = BigUint::zero();
+        let mut init = BigUint::from_str_radix(
+            "10000000000000000000000000000000000000000000000000000000000000000",
             16,
         ).unwrap();
 
-        let lmax = BigUint::from_str_radix(
-            "BC2FFFFFF",
-            16,
-        ).unwrap();
-
-        let num = BigUint::from(1122334455 as u32)-BigUint::one();
-
-        let k = FieldElem::from_biguint(&lmax);
-        let ret = curve.w_naf(&k.value,6);
-
-        // let init = BigUint::one();
-        // let two = BigUint::from(2 as u32);
-        //
-        // for i in 0..257{
-        //     let num:u32 = 0;
-        //     if ret[i] > 0{
-        //
-        //     }
-        // }
-        for i in 0..257{
+        for j in 0..257{
+            let i = 256 - j;
             if ret[i]!=0{
-                println!("{},{}",i,ret[i]);
+                if ret[i] > 0{
+                    sum += &init * BigUint::from(ret[i] as u8);
+                }
+                else{
+                    let neg = (0 - ret[i]) as u8;
+                    sum -= &init * BigUint::from(neg as u8);
+                }
             }
+            init = init >> 1;
         }
+        assert_eq!(sum,n);
     }
 
     #[test]
