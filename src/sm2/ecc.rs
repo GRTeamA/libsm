@@ -148,7 +148,7 @@ impl EccCtx {
         &self.n
     }
 
-    pub fn inv_n(&self, x: &BigUint) -> BigUint {
+    pub fn inv_n_old(&self, x: &BigUint) -> BigUint {
         if *x == BigUint::zero() {
             panic!("zero has no inversion.");
         }
@@ -178,6 +178,56 @@ impl EccCtx {
                     rc /= &two;
                 } else {
                     rc = (rc + &rn) / &two;
+                }
+            }
+
+            if ru >= rv {
+                ru -= &rv;
+                if ra >= rc {
+                    ra -= &rc;
+                } else {
+                    ra = ra + &rn - &rc;
+                }
+            } else {
+                rv -= &ru;
+                if rc >= ra {
+                    rc -= &ra;
+                } else {
+                    rc = rc + &rn - &ra;
+                }
+            }
+        }
+        rc
+    }
+
+    pub fn inv_n(&self, x: &BigUint) -> BigUint {
+        if *x == BigUint::zero() {
+            panic!("zero has no inversion.");
+        }
+
+        let mut ru = x.clone();
+        let mut rv = self.get_n().clone();
+        let mut ra = BigUint::one();
+        let mut rc = BigUint::zero();
+
+        let rn = self.get_n().clone();
+
+        while ru != BigUint::zero() {
+            if ru.is_even() {
+                ru = ru >> 1;
+                if ra.is_even() {
+                    ra = ra >> 1;
+                } else {
+                    ra = (ra + &rn) >> 1;
+                }
+            }
+
+            if rv.is_even() {
+                rv = rv >> 1;
+                if rc.is_even() {
+                    rc = rc >> 1;
+                } else {
+                    rc = (rc + &rn) >> 1;
                 }
             }
 
